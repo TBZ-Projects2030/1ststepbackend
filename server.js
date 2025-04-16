@@ -4,7 +4,7 @@ const cors = require("cors");
 const connectDB = require("./connection/connectDB");
 const mongoose = require("mongoose");
 require("dotenv").config();
-const port = 5000;
+const port = 9001;
 const app = express();
 
 /* Set Middle wares  */
