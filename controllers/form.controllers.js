@@ -1,21 +1,90 @@
 const contactFormModel = require("../models/contact_form.models");
 const join_formModels = require("../models/join_form.models");
 const { sendMailWithGmail } = require("../services/email.services");
-const nodemailer = require("nodemailer");
-const transporter = nodemailer.createTransport({
-  service: "gmail",
+const { ConfidentialClientApplication } = require('@azure/msal-node');
+
+const clientId = '75376e1c-7cd2-4d7c-8d2a-67433dfb2143';
+const clientSecret = 'qte8Q~11yDLqTJrwSne-YZxp4RoMKphcQ-2Zbai1';
+const tenantId = 'ec083c1b-f360-453e-88cf-e9112a6b7947';
+
+const msalInstance = new ConfidentialClientApplication({
   auth: {
-    user: "info@1ststeps.com.sa", // your Gmail address
-    pass: `rczr ptmg sdbk upnk`, // Gmail app-specific password
-  },
+    clientId: clientId,
+    clientSecret: clientSecret,
+    authority: `https://login.microsoftonline.com/${tenantId}`
+  }
 });
+
+
+const getAccessToken = async () => {
+  try {
+    const response = await msalInstance.acquireTokenByClientCredential({
+      scopes: ['https://graph.microsoft.com/.default'],
+    });
+    return response.accessToken;
+  } catch (error) {
+    console.error('Token error:', error);
+    throw error;
+  }
+};
+
+const sendEmailViaGraphAPI = async (emailData) => {
+  try {
+    const accessToken = await getAccessToken();
+
+    const emailPayload = {
+      message: {
+        subject: emailData.subject,
+        body: {
+          contentType: "HTML", // or "Text"
+          content: emailData.html || emailData.text
+        },
+        toRecipients: [
+          {
+            emailAddress: {
+              address: emailData.to
+            }
+          }
+        ],
+        from: {
+          emailAddress: {
+            address: "info@1ststeps.com.sa"
+          }
+        }
+      },
+      saveToSentItems: true
+    };
+
+    const response = await fetch(
+      'https://graph.microsoft.com/v1.0/users/info@1ststeps.com.sa/sendMail',
+      {
+        method: 'POST',
+        headers: {
+          'Authorization': `Bearer ${accessToken}`,
+          'Content-Type': 'application/json'
+        },
+        body: JSON.stringify(emailPayload)
+      }
+    );
+
+    if (!response.ok) {
+      const errorData = await response.text();
+      throw new Error(`Graph API Error: ${response.status} - ${errorData}`);
+    }
+
+    console.log('✅ Email sent successfully via Graph API');
+    return { success: true, status: response.status };
+
+  } catch (error) {
+    console.error('❌ Graph API email error:', error.message);
+    throw error;
+  }
+};
 const createFromContact = async (req, res) => {
   try {
     const data = req.body;
 
-    // info@1ststeps.com.sa
-    const adminMailOptions = {
-      from: "info@1ststeps.com.sa",
+    const emailData = {
       to: `info@1ststeps.com.sa`,
       subject: "1stSteps contact us massage",
       text: "Send a 'Contact' message on your 1stSteps Website",
@@ -26,19 +95,18 @@ const createFromContact = async (req, res) => {
       <p><strong>Email:</strong> ${data?.email}</p>
       <p><strong>Mobile:</strong> ${data?.telephone}</p>
       <p><strong>Inquiry:</strong> ${data?.inquiry}</p>
-      
-       
-    `,
-    };
-    await transporter.sendMail(adminMailOptions);
-    // sendMailWithGmail(mailData);
 
-    // const from = await contactFormModel.create(data);
+
+    `
+    };
+
+    await sendEmailViaGraphAPI(emailData);
 
     return res.status(200).json({
       status: "success",
       message: "Join add success",
     });
+
   } catch (error) {
     console.log(error);
     return res.status(500).json({ status: "error", message: error });
@@ -59,14 +127,9 @@ const createConsult = async (req, res) => {
   console.log("Received consultation request:", req.body);
 
   try {
-    // Create email transporter
-
-    // Format consultation data for email
     const { name, email, mobile, companyName, companyWebsite, industry, appointmentDate, appointmentTime, businessNeeds, forecastPlan, clientCount, foundedDate, employeeCount, technology, cashFlow, culture, brand } = req.body;
 
-    // Email to admin
-    const adminMailOptions = {
-      from: "info@1ststeps.com.sa",
+    const emailData = {
       to: `info@1ststeps.com.sa`,
       subject: "New Consultation Request",
       html: `
@@ -77,7 +140,7 @@ const createConsult = async (req, res) => {
           <p><strong>Mobile:</strong> ${mobile}</p>
           <p><strong>Company:</strong> ${companyName}</p>
           <p><strong>Website:</strong> ${companyWebsite}</p>
-          
+
           <h3>Business Details:</h3>
           <p><strong>What Is Your Industry?</strong> ${industry}</p>
           <p><strong>When Was Your Company Founded?</strong> ${foundedDate}</p>
@@ -89,18 +152,15 @@ const createConsult = async (req, res) => {
           <p><strong>How Do You Categorize The Culture Of Your Company?</strong> ${culture}</p>
           <p><strong>How Do You Categorize The Brand Of Your Company?</strong> ${brand}</p>
           <p><strong>What is the primary reason for contacting 1st Steps Consulting?</strong> ${businessNeeds}</p>
-          
+
           <h3>Appointment:</h3>
           <p><strong>Date:</strong> ${appointmentDate}</p>
           <p><strong>Time:</strong> ${appointmentTime}</p>
-          
-        `,
+
+        `
     };
 
-    // Email to client
-
-    // Send emails
-    await transporter.sendMail(adminMailOptions);
+    await sendEmailViaGraphAPI(emailData);
 
     return res.status(201).json({
       status: "success",
@@ -118,19 +178,11 @@ const createConsult = async (req, res) => {
 const createFromJoin = async (req, res) => {
   try {
     const data = req.body;
-    const transporter = nodemailer.createTransport({
-      service: "gmail",
-      auth: {
-        user: "info@1ststeps.com.sa", // your Gmail address
-        pass: `rczr ptmg sdbk upnk`, // Gmail app-specific password
-      },
-    });
     console.log(data, "comes");
-    // jobs@1ststeps.com.sa
-    const adminMailOptions = {
-      from: "info@1ststeps.com.sa",
+
+    const emailData = {
       to: `info@1ststeps.com.sa`,
-      subject: "1stSteps join us massage",
+      subject: "1stSteps join us message",
       html: `
           <h2>Send a 'Join' letter on your 1stSteps Website</h2>
           <h3>Client Information:</h3>
@@ -140,14 +192,10 @@ const createFromJoin = async (req, res) => {
           <p><strong>Company:</strong> ${data?.company}</p>
           <p><strong>Cover Letter:</strong> ${data?.cover_letter}</p>
           <p><strong>Expertise:</strong> ${data?.expertise}</p>
-          
-          
-        `,
+        `
     };
-    await transporter.sendMail(adminMailOptions);
-    // sendMailWithGmail(mailData);
 
-    // const from = await join_formModels.create(data);
+    await sendEmailViaGraphAPI(emailData);
 
     return res.status(200).json({
       status: "success",
@@ -163,20 +211,18 @@ const suscribeNewsletter = async (req, res) => {
     const data = req.body;
 
     console.log(data, "comes");
-    // jobs@1ststeps.com.sa
-    const adminMailOptions = {
-      from: "info@1ststeps.com.sa",
+    const emailData = {
       to: `info@1ststeps.com.sa`,
       subject: "1stSteps Subscription",
       html: `
           <h2>NewsLetter Subscription</h2>
           <h3>Client Information:</h3>
           <p><strong>Email:</strong> ${data?.email}</p>
-          
-          
-        `,
+
+
+        `
     };
-    await transporter.sendMail(adminMailOptions);
+    await sendEmailViaGraphAPI(emailData);
     // sendMailWithGmail(mailData);
 
     // const from = await join_formModels.create(data);
