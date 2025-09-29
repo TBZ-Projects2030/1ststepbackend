@@ -3,9 +3,9 @@ const join_formModels = require("../models/join_form.models");
 const { sendMailWithGmail } = require("../services/email.services");
 const { ConfidentialClientApplication } = require('@azure/msal-node');
 
-const clientId = '75376e1c-7cd2-4d7c-8d2a-67433dfb2143';
-const clientSecret = 'qte8Q~11yDLqTJrwSne-YZxp4RoMKphcQ-2Zbai1';
-const tenantId = 'ec083c1b-f360-453e-88cf-e9112a6b7947';
+const clientId = process.env.AZURE_CLIENT_ID;
+const clientSecret = process.env.AZURE_CLIENT_SECRET;
+const tenantId = process.env.AZURE_TENANT_ID;
 
 const msalInstance = new ConfidentialClientApplication({
   auth: {
